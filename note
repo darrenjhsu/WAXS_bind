@@ -1,0 +1,44 @@
+
+Classes:
+
+1. PDB class
+  - Takes a PDB protein file, allowing for processing coordinates. 
+  - Basic functionality from DENSS.
+  - Allow for calculating base form factors.
+
+2. Ligand class
+  - Takes a mol, pdb, or sdf file, or SMILES with rdkit.
+  - Convenient functions for getting elements.
+  - Convenient functions for generating coordinates through EmbedMultiConf()
+  - Allow for calculating base form factors.
+
+3. Rotation function
+  - Takes Ligand and rotate it (using COM as origin) to align to the unit vector from psi and phi
+  - Returns coordinates of rotated ligand
+
+4. Overlap function
+  - Takes both a PDB, a Ligand, Ligand conformer ID, and a grid spacing as input
+  - All atoms have 1 Angstrom radius
+  - Creates a 3D volume grid, and an xyz mesh off PDB and another off Ligand
+    - generate_grid() function gets min / max of the group and create a grid from that
+  - Dilates 3D PDB grid with Ligand grid; anything True will have overlap and not tried. Rest are "valid" points
+  - Optionally, group the remaining "possible" grid points to save time in XS calculation
+
+5. Scattering class
+  - __init__ takes c1 (= 1.0), c2 (= 2.0), r_m = 1.62, r_sol = 1.8, num_raster = 512, rho = 0.334 environmental values
+  - __init__ also takes a q-vector
+  - scatter() Takes PDB coordinates, PDB elements, Ligand coordinates, Ligand elements 
+    and calls CUDA C code through .so
+
+6. Data class
+  - __init__ takes (q, I, sigma)
+
+7. Fitting class
+  - __init__ takes apo, holo and optionally ligand Data classes, Protein class, and Ligand class
+  - fit_c1c2() generates a Scattering class and computes XS by varying c1 (0.95 ~ 1.05) and c2 (0.0 ~ 4.0) to fit to apo Data;
+    assigns c1 and c2 to c1_fit and c2_fit
+  - fit_binding() attempts to fit c1 and c2 first, but if there's c1/c2_fit, then initiates a Scattering class,
+    iterating through conformer, rotation, and valid overlap points to find best fit.
+    It should have a dry run capability to estimate the number of XS calculations needed
+
+
