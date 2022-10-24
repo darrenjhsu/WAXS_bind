@@ -8,8 +8,9 @@ class PDB:
         self.fname = fname
         self.pdb = saxstats.PDB(fname)
         self.elements = self.pdb.atomtype
+        self.electrons = np.array([saxstats.electrons.get(x, 6) for x in self.elements])
         self.has_grid = None
-        self.hasManyH = np.sum([x == 'H' for x in self.elements]) / np.sum([x != 'H' for x in self.elements]) > 0.5
+        self.hasManyH = np.sum([x == 'H' for x in self.elements]) / np.sum([x != 'H' for x in self.elements]) > 0.1
         self.near_radius = 8.0
         self.protein_nxyz = None # Number of points each dimension
         self.protein_gxyz = None # Grid xyz (N_size of protein_nxyz, 3)
@@ -29,7 +30,7 @@ class PDB:
         if element is not None:
             coords = self.pdb.coords[self.elements == 'Ve']
         else:
-            coords = self.pdb.coords
+            coords = self.pdb.coords[self.elements != 'H']
         if existing_grid is not None:
             self.grid_spacing = existing_grid.grid_spacing
         else:

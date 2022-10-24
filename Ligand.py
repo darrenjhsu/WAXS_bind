@@ -1,5 +1,6 @@
 
 import numpy as np
+from saxstats import saxstats
 import rdkit
 from rdkit import Chem
 from rdkit.Chem import AllChem
@@ -17,6 +18,11 @@ class Ligand:
 
 
         self.elements = np.array([self.molecule.GetAtoms()[x].GetSymbol() for x in range(self.molecule.GetNumAtoms())])
+        self.hasManyH = np.sum([x == 'H' for x in self.elements]) / np.sum([x != 'H' for x in self.elements]) > 0.1
+        if not self.hasManyH:
+            print("This ligand does not seem to have hydrogens modeled into them")
+            print("Consider doing so for best X-ray scattering signal accuracy")
+        self.electrons = np.array([saxstats.electrons.get(x, 6) for x in self.elements])
         self.num_conformers = self.molecule.GetNumConformers()
         self.num_atoms = len(self.elements)
 

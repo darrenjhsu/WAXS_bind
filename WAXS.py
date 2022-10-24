@@ -4,6 +4,8 @@ from scipy.spatial import distance_matrix
 from scipy.ndimage import generate_binary_structure, binary_dilation, convolve
 from saxstats import saxstats
 import time
+from xs_helper import xray_scatter 
+from array import array
 
 def sok(radius = 5.0, grid_spacing = 0.5, near_radius = 1.5):
     print(f'Creating a spherical occlusion kernel of radius {radius:.3f} A on a grid with {grid_spacing:.3f} A spacing')
@@ -80,7 +82,7 @@ def overlap_grid(protein, ligand, conformerID=0, rotation=None, pocket=None, gri
         print(f'{(t1-t0)*1000:.3f} ms protein grid generation')
     
     #print(protein_nxyz, ligand_nxyz, protein_gxyz.shape, protein_coords.shape, ligand_gxyz.shape, ligand_coords.shape)
-    ligand_coords = ligand.get_coordinates(conformerID)
+    ligand_coords = ligand.get_coordinates(conformerID)[ligand.elements != 'H']
     if rotation is not None: # It then should be 3x3 rotational matrix
         ligand_coords = ligand_coords @ rotation
     ligand_nxyz, ligand_gxyz, ligand_pxyz, ligand_sxyz, _, _ = grid(ligand_coords, grid_spacing, margin=radius, make_cubic=False, center_average=True)
@@ -172,3 +174,53 @@ def write_grid_points(xyz, v, fname='grid.pdb', O_col=None, B_col=None):
         for idx, ijkob in enumerate(xyzob[v]):
             write_pdb_line(f,'ATOM', str(idx+1), 'X', 'XXX', 'A', str(1), *ijkob, 'X')
 
+class Scatter:
+    def __init__(self, q=np.linspace(0, 1, 200), c1=1.0, c2=2.0, r_m=1.62, sol_s=1.8, num_raster=512, rho=0.334):
+        self.q = q
+        self.c1 = c1
+        self.c2 = c2
+        self.r_m = r_m
+        self.sol_s = sol_s
+        self.num_raster = num_raster
+        self.rho = rho
+
+    def scatter(self, protein=None, ligand=None, ligand_coords=None):
+        if protein is None and ligand is None:
+            print("No input, return None")
+            return None
+        # prepare coordinates from protein and optionally ligand
+        coords = np.empty((0, 3))
+        ele = np.empty(0)
+        if protein is not None:
+            coords = protein.pdb.coords
+            ele = np.concatenate([ele, protein.electrons - 1])
+        if ligand is not None:
+            # do things with ligand
+            if ligand_coords is not None:
+                if len(ligand_coords) == ligand.num_atoms:
+                    coords = np.vstack([coords, ligand_coords])
+                    ele = np.concatenate([ele, ligand.electrons - 1])
+                elif len(ligand_coords) == np.sum([x != 'H' for x in ligand.elements]):
+                    coords = np.vstack([coords, ligand_coords])
+                    ele = np.concatenate([ele, ligand.electrons[ligand.electrons != 'H'] - 1])
+                else:
+                    raise ValueError("ligand_coords coordinates must have ligand.num_atom atoms or that minus hydrogens")
+            else:
+                coords = np.vstack([coords, ligand.get_coordinates()])
+                ele = np.concatenate([ele, ligand.electrons - 1])
+                    
+        
+        # array-ize np arrays
+        coords_a = array('f', coords.flatten())
+        ele_a = array('I', ele.astype(int))
+        q_a = array('f', self.q)
+
+        t0 = time.time()
+        S_calc = xray_scatter(coords_a, ele_a, q_a, 
+                              num_raster=self.num_raster, sol_s=self.sol_s, 
+                              r_m=self.r_m, rho=self.rho, c1=self.c1, c2=self.c2)
+        t1 = time.time()
+
+        print(f'C = {(t1-t0)*1000:.3f} ms')
+
+        return S_calc
