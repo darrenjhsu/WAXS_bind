@@ -21,7 +21,7 @@ def xray_scatter(coords, ele, q,
     num_atom = len(ele)
     num_coords = 3 * num_atom
     num_q = len(q)
-    print(f'num atom: {num_atom}, num_coords: {num_coords}, num q: {num_q}')
+    #print(f'num atom: {num_atom}, num_coords: {num_coords}, num q: {num_q}')
     c_coords = (c_float * num_coords)(*coords)
     c_ele = (c_int * num_atom)(*ele)
     c_q = (c_float * num_q)(*q)

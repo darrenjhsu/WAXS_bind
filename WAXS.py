@@ -221,6 +221,9 @@ class Scatter:
                               r_m=self.r_m, rho=self.rho, c1=self.c1, c2=self.c2)
         t1 = time.time()
 
-        print(f'C = {(t1-t0)*1000:.3f} ms')
+        #print(f'C = {(t1-t0)*1000:.3f} ms')
 
         return S_calc
+
+def rotate_then_center(lig_coord, rot, xyz=np.array([0,0,0])):
+    return (lig_coord - lig_coord.mean(0)) @ rot + xyz

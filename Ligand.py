@@ -4,6 +4,7 @@ from saxstats import saxstats
 import rdkit
 from rdkit import Chem
 from rdkit.Chem import AllChem
+import networkx as nx
 
 class Ligand:
     def __init__(self, mol):
@@ -26,6 +27,8 @@ class Ligand:
         self.num_conformers = self.molecule.GetNumConformers()
         self.num_atoms = len(self.elements)
 
+        self.process_bonds()
+
     def generate_conformers(self, num_conformers=10):
         AllChem.EmbedMultipleConfs(self.molecule, numConfs=num_conformers)
         print(f'Generated {self.molecule.GetNumConformers()} conformers')
@@ -37,7 +40,34 @@ class Ligand:
             raise ValueError(f'Conformer ID requested ({conformerID}) is larger than number of conformers available ({self.num_conformers})')
         return self.molecule.GetConformer(conformerID).GetPositions()
 
+    def process_bonds(self):
+        RotatableBond = Chem.MolFromSmarts('[!$(*#*)&!D1]-&!@[!$(*#*)&!D1]')
+        self.rbond = self.molecule.GetSubstructMatches(RotatableBond)
+        self.bond = [(x.GetBeginAtomIdx(), x.GetEndAtomIdx()) for x in self.molecule.GetBonds()]   
+        self.rgroup = rot_group(self.bond, self.rbond)
 
+    def transform(self, conformerID=0, structure_parameters=None):
+        # structure parameters should either be 5 or 5 + len(rgroup) values
+        # x, y, z, theta [0, pi], phi [0, 2*pi], torsions [0, 2*pi]
+        assert len(structure_parameters) == 5 or len(structure_parameters) == 5 + len(self.rgroup)
+        sp = structure_parameters # shorthand
+        coord = self.get_coordinates(conformerID=conformerID).copy()
+        if len(structure_parameters) > 5:
+            for idx, r in sp[5:]:
+                # transform by torsion
+                coord[self.rgroup[idx][1]] = rotate_by_axis(coord[self.rgroup[idx][1]], coord[self.rgroup[idx][0][1]] - coord[self.rgroup[idx][0][0]])
+       coord = rotate_then_center(coord, make_rot(*sp[3:5]), np.array(*sp[:3]))
+       return coord  
+
+def rot_group(bond, rbond):
+    rgroup = []
+    G = nx.Graph()
+    G.add_edges_from(bond)
+    for r in rbond:
+        G.remove_edge(r[0], r[1])
+        rgroup.append([r, np.array(nx.descendants(G, r[1])]))
+        G.add_edge(r[0], r[1])
+    return rgroup
 
 
 
