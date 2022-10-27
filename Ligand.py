@@ -41,6 +41,15 @@ class Ligand:
             raise ValueError(f'Conformer ID requested ({conformerID}) is larger than number of conformers available ({self.num_conformers})')
         return self.molecule.GetConformer(conformerID).GetPositions()
 
+    def set_coordinates(self, coord, conformerID=0):
+        if conformerID >= self.num_conformers:
+            raise ValueError(f'Conformer ID requested ({conformerID}) is larger than number of conformers available ({self.num_conformers})')
+        from rdkit.Geometry import Point3D
+        conf = self.molecule.GetConformer(conformerID)
+        for i in range(self.num_atoms):
+            conf.SetAtomPosition(i,Point3D(*coord[i]))
+
+
     def process_bonds(self):
         RotatableBond = Chem.MolFromSmarts('[!$(*#*)&!D1]-&!@[!$(*#*)&!D1]')
         self.rbond = self.molecule.GetSubstructMatches(RotatableBond)

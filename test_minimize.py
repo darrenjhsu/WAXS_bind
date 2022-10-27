@@ -17,9 +17,17 @@ from scipy.optimize import minimize
 
 
 lig_gt = Ligand('1FIN_ligand.sdf')
+sp = np.zeros(5+lig_gt.num_torsion)
+sp[1] = 10
+sp[6] = 10
+sp[8] = 30
+sp[10] = 90
+#lig_gt.set_coordinates(lig_gt.transform(0, sp))
 lig_coord_gt = lig_gt.get_coordinates()
 
+sp = np.zeros(5+lig_gt.num_torsion)
 lig = Ligand('1FIN_ligand.sdf')
+#lig.set_coordinates(lig.transform(0, sp))
 lig.generate_conformers(1)
 
 def myminfunc(x, lig, lig_coord_gt):

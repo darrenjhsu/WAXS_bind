@@ -18,7 +18,7 @@ pro = PDB('1FIN_apo.pdb')
 lig_gt = Ligand('1FIN_ligand.sdf')
 lig_coord_gt = lig_gt.get_coordinates(0)
 lig = Ligand('1FIN_ligand.sdf')
-lig.generate_conformers(5)
+lig.generate_conformers(1)
 print(lig.elements, lig.electrons)
 pocket = PDB('1FIN_apo_out/1FIN_apo_out.pdb')
 
@@ -36,7 +36,7 @@ S_calc_lig = scat.scatter(ligand=lig)
 S_calc_complex_gt = np.array(scat.scatter(protein=pro, ligand=lig))
 
 
-rmat = rotation_sampling(18)
+rmat = rotation_sampling(6)
 num_conditions = lig.num_conformers * len(rmat)
 t0 = time.time()
 t1 = time.time()

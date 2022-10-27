@@ -95,12 +95,13 @@ def overlap_grid(protein, ligand, conformerID=0, rotation=None, pocket=None, gri
         print(f'{(t2-t1)*1000:.3f} ms ligand grid generation')
 
     #print(np.sum(protein_exclude_zone))
-    protein_volume = ~binary_dilation(protein_volume, structure=np.flip(ligand_volume))
+    #protein_volume = ~binary_dilation(protein_volume, structure=np.flip(ligand_volume))
     t3 = time.time()
     if timing:
         print(f'{(t3-t2)*1000:.3f} ms binary dilation')
 
-    protein_volume *= protein_near_zone
+    #protein_volume *= protein_near_zone
+    protein_volume = np.ones_like(protein_volume)
     if printing:
         print(f'There are {np.sum(protein_volume)} points deemed possible out of {num_voxels} points purely from overlap.')
     t4 = time.time()
