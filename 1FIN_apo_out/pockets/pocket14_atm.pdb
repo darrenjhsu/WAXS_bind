@@ -1,0 +1,36 @@
+HEADER
+HEADER This is a pdb format file writen by the programm fpocket.                 
+HEADER It represents the atoms contacted by the voronoi vertices of the pocket.  
+HEADER                                                                           
+HEADER Information about the pocket    14:
+HEADER 0  - Pocket Score                      : -0.0301
+HEADER 1  - Drug Score                        : 0.0005
+HEADER 2  - Number of alpha spheres           :    16
+HEADER 3  - Mean alpha-sphere radius          : 3.9957
+HEADER 4  - Mean alpha-sphere Solvent Acc.    : 0.6515
+HEADER 5  - Mean B-factor of pocket residues  : 0.4175
+HEADER 6  - Hydrophobicity Score              : -23.8333
+HEADER 7  - Polarity Score                    :     5
+HEADER 8  - Amino Acid based volume Score     : 4.3333
+HEADER 9  - Pocket volume (Monte Carlo)       : 238.0093
+HEADER 10  -Pocket volume (convex hull)       : 6.4477
+HEADER 11 - Charge Score                      :     2
+HEADER 12 - Local hydrophobic density Score   : 4.0000
+HEADER 13 - Number of apolar alpha sphere     :     5
+HEADER 14 - Proportion of apolar alpha sphere : 0.3125
+ATOM   1139   NZ LYS A 142     -15.752 213.457 104.165  0.00  0.00           N 0
+ATOM    509   CG LYS A  65     -19.761 209.093 102.848  0.00  0.00           C 0
+ATOM    649  OE2 GLU A  81     -14.653 211.114 103.840  0.17  9.64           O 0
+ATOM    648  OE1 GLU A  81     -16.569 210.673 104.749  0.64  1.07           O 0
+ATOM    647   CD GLU A  81     -15.422 210.334 104.405  0.00  0.00           C 0
+ATOM    510   CD LYS A  65     -20.016 208.579 101.465  0.00  0.00           C 0
+ATOM    645   CB GLU A  81     -15.066 207.893 103.945  0.00  0.00           C 0
+ATOM    467    O HIS A  60     -21.083 213.946 104.473  0.47  3.21           O 0
+ATOM    462  OD1 ASN A  59     -23.664 211.460 100.062  0.00  0.00           O 0
+ATOM    463  ND2 ASN A  59     -22.927 209.742 101.334  0.65  1.09           N 0
+ATOM    474    N PRO A  61     -21.194 215.917 103.363  0.66  1.09           N 0
+ATOM    466    C HIS A  60     -21.744 214.830 103.920  0.00  0.00           C 0
+ATOM    475   CA PRO A  61     -19.745 216.129 103.375  0.00  0.00           C 0
+ATOM    480   CD PRO A  61     -21.871 216.880 102.478  0.00  0.00           C 0
+TER
+END

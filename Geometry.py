@@ -1,17 +1,20 @@
 
 import numpy as np
-
+import math
 
 def rotx(deg):
     rad = deg / 180 * np.pi
     return np.array([[1, 0, 0], [0, np.cos(rad), np.sin(rad)], [0, -np.sin(rad), np.cos(rad)]])
-
 def roty(deg):
     rad = deg / 180 * np.pi
     return np.array([[np.cos(rad), 0, -np.sin(rad)], [0, 1, 0], [np.sin(rad), 0, np.cos(rad)]])
 def rotz(deg):
     rad = deg / 180 * np.pi
     return np.array([[np.cos(rad), np.sin(rad), 0], [-np.sin(rad), np.cos(rad), 0], [0, 0, 1]])
+
+def make_rot(theta, phi):
+    # theta is [0, pi], phi is [0, 2*pi]
+    return roty(theta) @ rotz(phi)
 
 def rotation_sampling(sampling=18):
     rmat = []
@@ -79,3 +82,26 @@ def pureRMSD(P, Q):
     diff = P - Q
     N = len(P)
     return np.sqrt((diff * diff).sum() / N)
+
+
+def rotate_by_axis(v, a0, a1, degrees):
+    """
+    Return the rotation matrix associated with counterclockwise rotation about
+    the given axis by theta radians. Using the Euler-Rodrigues formula:
+    https://stackoverflow.com/questions/6802577/rotation-of-3d-vector
+    """
+    axis = np.asarray(a1-a0)
+    axis = axis / math.sqrt(np.dot(axis, axis))
+    theta = degrees * math.pi / 180
+    a = math.cos(theta / 2.0)
+    b, c, d = -axis * math.sin(theta / 2.0)
+    aa, bb, cc, dd = a * a, b * b, c * c, d * d
+    bc, ad, ac, ab, bd, cd = b * c, a * d, a * c, a * b, b * d, c * d
+    rot_mat = np.array([[aa + bb - cc - dd, 2 * (bc + ad), 2 * (bd - ac)],
+                        [2 * (bc - ad), aa + cc - bb - dd, 2 * (cd + ab)],
+                        [2 * (bd + ac), 2 * (cd - ab), aa + dd - bb - cc]])
+
+    return np.dot(rot_mat, (v-a1).T).T + a1
+
+def rotate_then_center(lig_coord, rot, xyz=np.array([0,0,0])):
+    return (rot @ (lig_coord - lig_coord.mean(0)).T).T + xyz

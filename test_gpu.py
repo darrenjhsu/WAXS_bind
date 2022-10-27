@@ -15,10 +15,12 @@ from array import array
 
 
 pro = PDB('1FIN_apo.pdb')
-lig = Ligand('1FIN_ligand.pdb')
-lig_coord_gt = lig.get_coordinates(0)
+lig_gt = Ligand('1FIN_ligand.sdf')
+lig_coord_gt = lig_gt.get_coordinates(0)
+lig = Ligand('1FIN_ligand.sdf')
+lig.generate_conformers(5)
 print(lig.elements, lig.electrons)
-pocket = PDB('test_fpocket/1FIN_apo_out/1FIN_apo_out.pdb')
+pocket = PDB('1FIN_apo_out/1FIN_apo_out.pdb')
 
 t0 = time.time()
 pv, pg, ps, lv, lg, ls = overlap_grid(pro, lig, conformerID=0, pocket=pocket, 
@@ -34,8 +36,8 @@ S_calc_lig = scat.scatter(ligand=lig)
 S_calc_complex_gt = np.array(scat.scatter(protein=pro, ligand=lig))
 
 
-rmat = rotation_sampling(6)
-num_conditions = 1 * len(rmat)
+rmat = rotation_sampling(18)
+num_conditions = lig.num_conformers * len(rmat)
 t0 = time.time()
 t1 = time.time()
 condition_idx = 0
@@ -44,7 +46,7 @@ XS_calc_time = 0
 rmsd_list = []
 chi_list = []
 other_info = []
-for confID in range(1):
+for confID in range(lig.num_conformers):
     for idx, rot in enumerate(rmat):
         pv, pg, ps, lv, lg, ls = overlap_grid(pro, lig, conformerID=confID, rotation=rot, pocket=pocket, 
                                               grid_spacing=1.0, radius=1.0, write_grid=False, timing=False, 

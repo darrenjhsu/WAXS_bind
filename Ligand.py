@@ -5,6 +5,7 @@ import rdkit
 from rdkit import Chem
 from rdkit.Chem import AllChem
 import networkx as nx
+from Geometry import *
 
 class Ligand:
     def __init__(self, mol):
@@ -45,19 +46,23 @@ class Ligand:
         self.rbond = self.molecule.GetSubstructMatches(RotatableBond)
         self.bond = [(x.GetBeginAtomIdx(), x.GetEndAtomIdx()) for x in self.molecule.GetBonds()]   
         self.rgroup = rot_group(self.bond, self.rbond)
+        self.num_torsion = len(self.rgroup)
 
-    def transform(self, conformerID=0, structure_parameters=None):
+    def transform(self, conformerID=0, structure_parameters=None, sp=None, debug=False):
         # structure parameters should either be 5 or 5 + len(rgroup) values
         # x, y, z, theta [0, pi], phi [0, 2*pi], torsions [0, 2*pi]
-        assert len(structure_parameters) == 5 or len(structure_parameters) == 5 + len(self.rgroup)
-        sp = structure_parameters # shorthand
+        if structure_parameters is not None and sp is None:
+            sp = structure_parameters # shorthand 
+        assert len(sp) == 5 or len(sp) == 5 + self.num_torsion
         coord = self.get_coordinates(conformerID=conformerID).copy()
-        if len(structure_parameters) > 5:
-            for idx, r in sp[5:]:
+        coord = rotate_then_center(coord, make_rot(*sp[3:5]), np.array(sp[:3]))
+        if len(sp) > 5:
+            for idx, r in enumerate(sp[5:]):
+                if debug:
+                    print(f'Rotating atom group {self.rgroup[idx][1]} by {r} degrees')
                 # transform by torsion
-                coord[self.rgroup[idx][1]] = rotate_by_axis(coord[self.rgroup[idx][1]], coord[self.rgroup[idx][0][1]] - coord[self.rgroup[idx][0][0]])
-       coord = rotate_then_center(coord, make_rot(*sp[3:5]), np.array(*sp[:3]))
-       return coord  
+                coord[self.rgroup[idx][1]] = rotate_by_axis(coord[self.rgroup[idx][1]], coord[self.rgroup[idx][0][0]], coord[self.rgroup[idx][0][1]], r)
+        return coord  
 
 def rot_group(bond, rbond):
     rgroup = []
@@ -65,7 +70,7 @@ def rot_group(bond, rbond):
     G.add_edges_from(bond)
     for r in rbond:
         G.remove_edge(r[0], r[1])
-        rgroup.append([r, np.array(nx.descendants(G, r[1])]))
+        rgroup.append([r, np.array(list(nx.descendants(G, r[1]))).astype(int)])
         G.add_edge(r[0], r[1])
     return rgroup
 

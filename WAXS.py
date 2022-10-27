@@ -6,6 +6,7 @@ from saxstats import saxstats
 import time
 from xs_helper import xray_scatter 
 from array import array
+from Geometry import *
 
 def sok(radius = 5.0, grid_spacing = 0.5, near_radius = 1.5):
     print(f'Creating a spherical occlusion kernel of radius {radius:.3f} A on a grid with {grid_spacing:.3f} A spacing')
@@ -108,7 +109,7 @@ def overlap_grid(protein, ligand, conformerID=0, rotation=None, pocket=None, gri
 
     if pocket is not None: # pocket is a PDB object
         if not pocket.has_grid:
-            pocket.create_grid(grid_spacing, 2.5, existing_grid=protein, element='Ve')
+            pocket.create_grid(grid_spacing, 3.0, existing_grid=protein, element='Ve')
         pocket_volume = pocket.protein_volume
         #pv2 = distance_matrix(protein_gxyz[protein_volume.flatten()], pocket_coord).min(1) > 2
         protein_volume *= pocket_volume
@@ -225,5 +226,3 @@ class Scatter:
 
         return S_calc
 
-def rotate_then_center(lig_coord, rot, xyz=np.array([0,0,0])):
-    return (lig_coord - lig_coord.mean(0)) @ rot + xyz

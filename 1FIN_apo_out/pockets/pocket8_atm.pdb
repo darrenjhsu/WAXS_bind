@@ -1,0 +1,40 @@
+HEADER
+HEADER This is a pdb format file writen by the programm fpocket.                 
+HEADER It represents the atoms contacted by the voronoi vertices of the pocket.  
+HEADER                                                                           
+HEADER Information about the pocket     8:
+HEADER 0  - Pocket Score                      : 0.0348
+HEADER 1  - Drug Score                        : 0.0002
+HEADER 2  - Number of alpha spheres           :    25
+HEADER 3  - Mean alpha-sphere radius          : 3.8908
+HEADER 4  - Mean alpha-sphere Solvent Acc.    : 0.5673
+HEADER 5  - Mean B-factor of pocket residues  : 0.4841
+HEADER 6  - Hydrophobicity Score              : 28.1111
+HEADER 7  - Polarity Score                    :     2
+HEADER 8  - Amino Acid based volume Score     : 4.0000
+HEADER 9  - Pocket volume (Monte Carlo)       : 267.5044
+HEADER 10  -Pocket volume (convex hull)       : 7.1728
+HEADER 11 - Charge Score                      :     1
+HEADER 12 - Local hydrophobic density Score   : 1.0000
+HEADER 13 - Number of apolar alpha sphere     :     2
+HEADER 14 - Proportion of apolar alpha sphere : 0.0800
+ATOM    793   CA PRO A 100      -6.148 229.552 114.690  0.00  0.00           C 0
+ATOM    783    O GLY A  98      -3.179 226.798 117.407  0.66  4.29           O 0
+ATOM    797   CG PRO A 100      -4.634 228.351 113.263  0.00  0.00           C 0
+ATOM    776    O THR A  97      -1.337 228.766 119.112  0.34  9.64           O 0
+ATOM    792    N PRO A 100      -5.815 228.231 115.266  0.00  0.00           N 0
+ATOM    786    C ILE A  99      -6.360 227.781 116.392  0.00  0.00           C 0
+ATOM    782    C GLY A  98      -3.939 226.759 118.357  0.00  0.00           C 0
+ATOM    805  CD1 LEU A 101      -9.203 231.636 118.145  0.00  0.00           C 0
+ATOM   1595  NH2 ARG A 199      -2.375 229.782 122.535  0.00  0.00           N 0
+ATOM   2041   CB PRO A 254      -9.325 234.332 122.423  0.00  0.00           C 0
+ATOM   2042   CG PRO A 254      -8.930 233.606 123.695  0.00  0.00           C 0
+ATOM    787    O ILE A  99      -7.197 228.435 117.013  0.65  2.14           O 0
+ATOM    799    N LEU A 101      -7.984 231.055 115.141  0.29  8.75           N 0
+ATOM    781   CA GLY A  98      -3.382 226.945 119.764  0.00  0.00           C 0
+ATOM   1592   NE ARG A 199      -3.773 228.134 123.301  0.00  0.00           N 0
+ATOM   1574    O VAL A 197      -9.089 229.602 123.043  0.39  7.50           O 0
+ATOM    784    N ILE A  99      -5.246 226.549 118.220  0.00  0.00           N 0
+ATOM   1566    O MET A 196      -9.109 226.557 121.060  0.59  2.14           O 0
+TER
+END
