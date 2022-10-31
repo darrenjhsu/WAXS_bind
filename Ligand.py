@@ -6,9 +6,10 @@ from rdkit import Chem
 from rdkit.Chem import AllChem
 import networkx as nx
 from Geometry import *
+from rdkit.Geometry import Point3D
 
 class Ligand:
-    def __init__(self, mol):
+    def __init__(self, mol, addHs=False):
         # mol can be filename of pdb, sdf, or a SMILES string
         if '.pdb' in mol:
             self.molecule = Chem.MolFromPDBFile(mol)
@@ -16,6 +17,8 @@ class Ligand:
             self.molecule = Chem.MolFromMolFile(mol)
         else:
             self.molecule = Chem.MolFromSmiles(mol)
+
+        if addHs:
             self.molecule = Chem.AddHs(self.molecule, addCoords=True)
 
 
@@ -24,6 +27,8 @@ class Ligand:
         if not self.hasManyH:
             print("This ligand does not seem to have hydrogens modeled into them")
             print("Consider doing so for best X-ray scattering signal accuracy")
+        else:
+            print("This ligand seems to have hydrogens modeled")
         self.electrons = np.array([saxstats.electrons.get(x, 6) for x in self.elements])
         self.num_conformers = self.molecule.GetNumConformers()
         self.num_atoms = len(self.elements)
@@ -44,7 +49,6 @@ class Ligand:
     def set_coordinates(self, coord, conformerID=0):
         if conformerID >= self.num_conformers:
             raise ValueError(f'Conformer ID requested ({conformerID}) is larger than number of conformers available ({self.num_conformers})')
-        from rdkit.Geometry import Point3D
         conf = self.molecule.GetConformer(conformerID)
         for i in range(self.num_atoms):
             conf.SetAtomPosition(i,Point3D(*coord[i]))
@@ -53,20 +57,22 @@ class Ligand:
     def process_bonds(self):
         RotatableBond = Chem.MolFromSmarts('[!$(*#*)&!D1]-&!@[!$(*#*)&!D1]')
         self.rbond = self.molecule.GetSubstructMatches(RotatableBond)
-        self.bond = [(x.GetBeginAtomIdx(), x.GetEndAtomIdx()) for x in self.molecule.GetBonds()]   
+        self.bond = [(x.GetBeginAtomIdx(), x.GetEndAtomIdx()) for x in self.molecule.GetBonds()] 
         self.rgroup = rot_group(self.bond, self.rbond)
         self.num_torsion = len(self.rgroup)
 
-    def transform(self, conformerID=0, structure_parameters=None, sp=None, debug=False):
+    def transform(self, conformerID=0, structure_parameters=None, debug=False):
         # structure parameters should either be 5 or 5 + len(rgroup) values
         # x, y, z, theta [0, pi], phi [0, 2*pi], torsions [0, 2*pi]
-        if structure_parameters is not None and sp is None:
-            sp = structure_parameters # shorthand 
-        assert len(sp) == 5 or len(sp) == 5 + self.num_torsion
+        assert len(structure_parameters) == 6 or len(structure_parameters) == 6 + self.num_torsion
+        if debug:
+            print(structure_parameters)
+        sp = structure_parameters.copy()
+        sp[3:] *= 18
         coord = self.get_coordinates(conformerID=conformerID).copy()
-        coord = rotate_then_center(coord, make_rot(*sp[3:5]), np.array(sp[:3]))
-        if len(sp) > 5:
-            for idx, r in enumerate(sp[5:]):
+        coord = rotate_then_center(coord, make_rot_xyz(*sp[3:6]), np.array(sp[:3]))
+        if len(sp) > 6:
+            for idx, r in enumerate(sp[6:]):
                 if debug:
                     print(f'Rotating atom group {self.rgroup[idx][1]} by {r} degrees')
                 # transform by torsion

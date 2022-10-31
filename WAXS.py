@@ -136,7 +136,25 @@ def overlap_grid(protein, ligand, conformerID=0, rotation=None, pocket=None, gri
 
     return protein_volume, protein_gxyz, protein_sxyz, ligand_volume, ligand_gxyz, ligand_sxyz
 
-
+def overlap(protein, ligand, conformerID=0, ligand_coords=None, radius=1.1, timing=False):
+    if not protein.hasManyH:
+        radius += 0.1
+    if not ligand.hasManyH:
+        radius += 0.1
+    t0 = time.time()
+    if ligand_coords is None:
+        new_ligand_coords = ligand.get_coordinates(conformerID)
+        print(f'Using coords from conformer {conformerID}')
+    else:
+        new_ligand_coords = ligand_coords
+    dist = np.sqrt(((protein.pdb.coords[:, :, None] - ligand_coords[:, :, None].T)**2).sum(1))
+    penalty = (2 * radius - dist)
+    penalty[penalty < 0] = 0
+    penalty = penalty ** 12
+    t1 = time.time()
+    if timing:
+        print(f'Timing for overlap: {(t1-t0)*1000:.2f} ms')
+    return np.sum(penalty)
  
 def write_pdb_line(f,*j,endline=False):
     j = list(j)

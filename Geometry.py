@@ -16,6 +16,9 @@ def make_rot(theta, phi):
     # theta is [0, pi], phi is [0, 2*pi]
     return roty(theta) @ rotz(phi)
 
+def make_rot_xyz(degx, degy, degz):
+    return rotx(degx) @ roty(degy) @ rotz(degz)
+
 def rotation_sampling(sampling=18):
     rmat = []
     for i in range(0, 180, 180//sampling):

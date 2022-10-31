@@ -16,7 +16,8 @@ from array import array
 
 lig = Ligand('1FIN_ligand.sdf')
 print(lig.get_coordinates())
-sp = np.zeros(5+lig.num_torsion)
+sp = np.zeros(6+lig.num_torsion)
+sp[:6] = np.random.random(6) * 10
 print("Zero everything")
 print(lig.transform(structure_parameters=sp))
 #sp[1] += 1
@@ -24,6 +25,5 @@ print(lig.transform(structure_parameters=sp))
 #sp[1] = 0
 #sp[3] = 90
 #print(lig.transform(structure_parameters=sp))
-sp = np.zeros(5+lig.num_torsion)
-sp[6] = 90
+sp[6] = 360
 print(lig.transform(structure_parameters=sp, debug=True))
