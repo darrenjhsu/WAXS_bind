@@ -2,9 +2,11 @@
 import numpy as np
 from saxstats import saxstats
 from WAXS import *
+from rdkit import Chem
+from rdkit.Chem import AllChem
 
 class PDB:
-    def __init__(self, fname):
+    def __init__(self, fname, generate_params=False):
         self.fname = fname
         self.pdb = saxstats.PDB(fname)
         self.elements = self.pdb.atomtype
@@ -22,6 +24,16 @@ class PDB:
             print('This PDB seem to have hydrogens modeled')
         else:
             print('This PDB does not seem to have hydrogens modeled')
+        
+        if generate_params:
+            pro = Chem.MolFromPDBFile(fname)
+            self.num_atoms = pro.GetNumAtoms()
+            pro = Chem.AddHs(pro, addCoords=True)
+            MMFF_pro = AllChem.MMFFGetMoleculeProperties(pro)
+            self.partial_charge = np.array([MMFF_pro.GetMMFFPartialCharge(x) for x in range(self.num_atoms)])
+        else:
+            self.partial_charge = None
+
 
     def create_grid(self, grid_spacing, radius, existing_grid=None, element=None):
         if existing_grid is not None:

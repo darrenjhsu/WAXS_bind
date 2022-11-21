@@ -13,14 +13,17 @@ class Ligand:
         # mol can be filename of pdb, sdf, or a SMILES string
         if '.pdb' in mol:
             self.molecule = Chem.MolFromPDBFile(mol)
+            self.molecule2 = Chem.MolFromPDBFile(mol) # This is for scipy.optimization, where we set coordinates to compute energy
         elif '.sdf' in mol:
             self.molecule = Chem.MolFromMolFile(mol)
+            self.molecule2 = Chem.MolFromMolFile(mol)
         else:
             self.molecule = Chem.MolFromSmiles(mol)
+            self.molecule2 = Chem.MolFromMolFile(mol)
 
         if addHs:
             self.molecule = Chem.AddHs(self.molecule, addCoords=True)
-
+            self.molecule2 = Chem.AddHs(self.molecule2, addCoords=True)
 
         self.elements = np.array([self.molecule.GetAtoms()[x].GetSymbol() for x in range(self.molecule.GetNumAtoms())])
         self.hasManyH = np.sum([x == 'H' for x in self.elements]) / np.sum([x != 'H' for x in self.elements]) > 0.1
@@ -34,6 +37,9 @@ class Ligand:
         self.num_atoms = len(self.elements)
 
         self.process_bonds()
+        MMFF_pro = AllChem.MMFFGetMoleculeProperties(self.molecule2) # pro stands for property
+        self.MMFF_lig = AllChem.MMFFGetMoleculeForceField(self.molecule2, MMFF_pro)
+        self.partial_charge = np.array([MMFF_pro.GetMMFFPartialCharge(x) for x in range(self.num_atoms)])
 
     def generate_conformers(self, num_conformers=10):
         AllChem.EmbedMultipleConfs(self.molecule, numConfs=num_conformers)
@@ -53,6 +59,11 @@ class Ligand:
         for i in range(self.num_atoms):
             conf.SetAtomPosition(i,Point3D(*coord[i]))
 
+    def optimize_conformer(self, conformerID=0):
+        AllChem.MMFFOptimizeMolecule(self.molecule, confID=conformerID)
+
+    def optimize_all_conformers(self):
+        AllChem.MMFFOptimizeMoleculeConfs(self.molecule)
 
     def process_bonds(self):
         RotatableBond = Chem.MolFromSmarts('[!$(*#*)&!D1]-&!@[!$(*#*)&!D1]')
@@ -70,14 +81,22 @@ class Ligand:
         sp = structure_parameters.copy()
         sp[3:] *= 18
         coord = self.get_coordinates(conformerID=conformerID).copy()
-        coord = rotate_then_center(coord, make_rot_xyz(*sp[3:6]), np.array(sp[:3]))
         if len(sp) > 6:
             for idx, r in enumerate(sp[6:]):
                 if debug:
                     print(f'Rotating atom group {self.rgroup[idx][1]} by {r} degrees')
                 # transform by torsion
                 coord[self.rgroup[idx][1]] = rotate_by_axis(coord[self.rgroup[idx][1]], coord[self.rgroup[idx][0][0]], coord[self.rgroup[idx][0][1]], r)
+        coord = rotate_then_center(coord, make_rot_xyz(*sp[3:6]), np.array(sp[:3]))
         return coord  
+
+    def calculate_energy(self, ligand_coords=None):
+        if ligand_coords is not None:
+            conf = self.molecule2.GetConformer(0)
+            for i in range(self.num_atoms):
+                conf.SetAtomPosition(i,Point3D(*ligand_coords[i]))
+            
+        return self.MMFF_lig.CalcEnergy()
 
 def rot_group(bond, rbond):
     rgroup = []

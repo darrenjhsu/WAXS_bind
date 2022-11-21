@@ -94,14 +94,13 @@ def overlap_grid(protein, ligand, conformerID=0, rotation=None, pocket=None, gri
     if timing:
         print(f'{(t2-t1)*1000:.3f} ms ligand grid generation')
 
-    #print(np.sum(protein_exclude_zone))
-    #protein_volume = ~binary_dilation(protein_volume, structure=np.flip(ligand_volume))
+    protein_volume = ~binary_dilation(protein_volume, structure=np.flip(ligand_volume))
     t3 = time.time()
     if timing:
         print(f'{(t3-t2)*1000:.3f} ms binary dilation')
 
     #protein_volume *= protein_near_zone
-    protein_volume = np.ones_like(protein_volume)
+    #protein_volume = np.ones_like(protein_volume)
     if printing:
         print(f'There are {np.sum(protein_volume)} points deemed possible out of {num_voxels} points purely from overlap.')
     t4 = time.time()
@@ -124,6 +123,7 @@ def overlap_grid(protein, ligand, conformerID=0, rotation=None, pocket=None, gri
         #    print(f'{(t42-t41)*1000:.3f} ms matrix assignment')
         if printing:
             print(f'There are {np.sum(protein_volume)} points deemed possible out of {num_voxels} points after pocket overlap.')
+
     t5 = time.time()
     if timing:
         print(f'{(t5-t4)*1000:.3f} ms pocket filter')
@@ -148,13 +148,17 @@ def overlap(protein, ligand, conformerID=0, ligand_coords=None, radius=1.1, timi
     else:
         new_ligand_coords = ligand_coords
     dist = np.sqrt(((protein.pdb.coords[:, :, None] - ligand_coords[:, :, None].T)**2).sum(1))
+    # vdW penalty
     penalty = (2 * radius - dist)
     penalty[penalty < 0] = 0
     penalty = penalty ** 12
+    # elec interaction
+    ei = protein.partial_charge[:,None] * ligand.partial_charge[None,:] / (dist + 1e-4) 
+
     t1 = time.time()
     if timing:
         print(f'Timing for overlap: {(t1-t0)*1000:.2f} ms')
-    return np.sum(penalty)
+    return np.sum(penalty), np.sum(ei)
  
 def write_pdb_line(f,*j,endline=False):
     j = list(j)
