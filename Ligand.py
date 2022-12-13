@@ -73,7 +73,7 @@ class Ligand:
         self.num_torsion = len(self.rgroup)
 
     def transform(self, conformerID=0, structure_parameters=None, debug=False):
-        # structure parameters should either be 5 or 5 + len(rgroup) values
+        # structure parameters should either be 6 or 6 + len(rgroup) values
         # x, y, z, theta [0, pi], phi [0, 2*pi], torsions [0, 2*pi]
         assert len(structure_parameters) == 6 or len(structure_parameters) == 6 + self.num_torsion
         if debug:
@@ -84,7 +84,8 @@ class Ligand:
         if len(sp) > 6:
             for idx, r in enumerate(sp[6:]):
                 if debug:
-                    print(f'Rotating atom group {self.rgroup[idx][1]} by {r} degrees')
+                    print(f'{idx}: ', end=' ')
+                    print(f'Rotating atom group {self.rgroup[idx][1]} by {r} degrees using {self.rgroup[idx][0]} as axis')
                 # transform by torsion
                 coord[self.rgroup[idx][1]] = rotate_by_axis(coord[self.rgroup[idx][1]], coord[self.rgroup[idx][0][0]], coord[self.rgroup[idx][0][1]], r)
         coord = rotate_then_center(coord, make_rot_xyz(*sp[3:6]), np.array(sp[:3]))
