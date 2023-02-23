@@ -36,10 +36,13 @@ class Ligand:
         self.num_conformers = self.molecule.GetNumConformers()
         self.num_atoms = len(self.elements)
 
+
+        self.MMFF_pro = AllChem.MMFFGetMoleculeProperties(self.molecule) # pro stands for property
+        self.MMFF_lig = AllChem.MMFFGetMoleculeForceField(self.molecule, self.MMFF_pro)
+        self.partial_charge = np.array([self.MMFF_pro.GetMMFFPartialCharge(x) for x in range(self.num_atoms)])
         self.process_bonds()
-        MMFF_pro = AllChem.MMFFGetMoleculeProperties(self.molecule2) # pro stands for property
-        self.MMFF_lig = AllChem.MMFFGetMoleculeForceField(self.molecule2, MMFF_pro)
-        self.partial_charge = np.array([MMFF_pro.GetMMFFPartialCharge(x) for x in range(self.num_atoms)])
+        self.process_angles()
+        self.process_graph()
 
     def generate_conformers(self, num_conformers=10):
         AllChem.EmbedMultipleConfs(self.molecule, numConfs=num_conformers)
@@ -71,24 +74,64 @@ class Ligand:
         self.bond = [(x.GetBeginAtomIdx(), x.GetEndAtomIdx()) for x in self.molecule.GetBonds()] 
         self.rgroup = rot_group(self.bond, self.rbond)
         self.num_torsion = len(self.rgroup)
-
+        
+    def process_graph(self):
+        self.G = nx.Graph()
+        self.G.add_edges_from(self.bond)
+        self.A = self.electrons
+        
+    def process_angles(self):
+        agroup_candidates = []
+        for i in range(self.num_atoms):
+            for j in range(self.num_atoms):
+                for k in range(i+1, self.num_atoms):
+                    if self.MMFF_pro.GetMMFFAngleBendParams(self.molecule, i,j,k) is not None:
+                        # do something similar to rot_group with following criteria:
+                        # 1. The molecule has to break into three parts
+                        # 2. All parts should be > 1 atom
+                        agroup_candidates.append(np.array([i,j,k]))
+#                         print(i,j,k,self.MMFF_pro.GetMMFFAngleBendParams(self.molecule, i,j,k))
+        self.agroup = angle_group(self.bond, agroup_candidates)
+        self.num_angle = len(self.agroup)
+        
     def transform(self, conformerID=0, structure_parameters=None, debug=False):
         # structure parameters should either be 6 or 6 + len(rgroup) values
         # x, y, z, theta [0, pi], phi [0, 2*pi], torsions [0, 2*pi]
-        assert len(structure_parameters) == 6 or len(structure_parameters) == 6 + self.num_torsion
+        # structure parameters should be a dict of np arrays:
+        # t = [x, y, z] (translation)
+        # r = [rotx, roty, rotz] (rotation)
+        # a = [ang1, ang2, ...] (bond angles)
+        # d = [dihe1, dihe2 ...] (dihedral angles / torsions)
+        sp = structure_parameters.copy()
+        for t, n in zip(['t', 'r', 'a', 'd'], [3, 3, len(self.agroup), len(self.rgroup)]):
+            if t in sp:
+                assert len(sp[t]) == n
+                sp[t] = np.array(sp[t])
+            else:
+                if t in ['t', 'r']:
+                    sp[t] = np.zeros(n)
         if debug:
             print(structure_parameters)
-        sp = structure_parameters.copy()
-        sp[3:] *= 18
+
         coord = self.get_coordinates(conformerID=conformerID).copy()
-        if len(sp) > 6:
-            for idx, r in enumerate(sp[6:]):
+        
+        # Transform by torsion
+        if 'd' in sp:
+            for idx, r in enumerate(sp['d']):
                 if debug:
                     print(f'{idx}: ', end=' ')
                     print(f'Rotating atom group {self.rgroup[idx][1]} by {r} degrees using {self.rgroup[idx][0]} as axis')
-                # transform by torsion
                 coord[self.rgroup[idx][1]] = rotate_by_axis(coord[self.rgroup[idx][1]], coord[self.rgroup[idx][0][0]], coord[self.rgroup[idx][0][1]], r)
-        coord = rotate_then_center(coord, make_rot_xyz(*sp[3:6]), np.array(sp[:3]))
+        
+        if 'a' in sp:
+            # Transform by angle
+            for idx, r in enumerate(sp['a']):
+                if debug:
+                    print(f'{idx}: ', end=' ')
+                    print(f'Rotating atom group {self.agroup[idx][1]} and {self.agroup[idx][2]} by {r} degrees using {self.agroup[idx][0]} as axis')
+                coord[self.agroup[idx][1]], coord[self.agroup[idx][2]] = rotate_by_3pt(coord[self.agroup[idx][1]], coord[self.agroup[idx][2]], coord[self.agroup[idx][0]], r)
+
+        coord = rotate_then_center(coord, make_rot_xyz(*sp['r']), np.array(sp['t']))
         return coord  
 
     def calculate_energy(self, ligand_coords=None):
@@ -98,6 +141,15 @@ class Ligand:
                 conf.SetAtomPosition(i,Point3D(*ligand_coords[i]))
             
         return self.MMFF_lig.CalcEnergy()
+    
+    def save(self, fname):
+        assert fname is not None, "Must provide filename in .pdb or .sdf format"
+        if fname.split('.')[-1] == 'pdb':
+            Chem.MolToPDBFile(self.molecule, fname)
+        elif fname.split('.')[-1] == 'sdf':
+            Chem.MolToMolFile(self.molecule, fname)
+        else:
+            print("File format not supported, use either pdb or sdf")
 
 def rot_group(bond, rbond):
     rgroup = []
@@ -109,5 +161,33 @@ def rot_group(bond, rbond):
         G.add_edge(r[0], r[1])
     return rgroup
 
-
+def angle_group(bond, abond_candidate):
+    agroup = []
+    G = nx.Graph()
+    G.add_edges_from(bond)
+    for r in abond_candidate:
+#         print(f'Processing candidate {r}')
+        G.remove_edge(r[0], r[1])
+        G.remove_edge(r[1], r[2])
+        subG = list(G.subgraph(c) for c in nx.connected_components(G))
+#         print(len(subG))
+#         print(f'Graph is split to {len(subG)} subgraphs')
+        if len(subG) == 3:
+            for s in subG:
+                if (r[1] in s):
+                    continue
+                if (len(s) == 1):
+                    break
+            else:
+                # This is a valid bond angle
+                agroup.append([r, np.array(list(nx.descendants(G, r[0]) | {r[0]})).astype(int), np.array(list(nx.descendants(G, r[2]) | {r[2]})).astype(int)])
+        G.add_edge(r[0], r[1])
+        G.add_edge(r[1], r[2])
+#     print(agroup)
+    return agroup
+                        
+                    
+          
+            
+            
 

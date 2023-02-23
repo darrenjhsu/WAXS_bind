@@ -1,6 +1,8 @@
 
+from typing import Any, List, Optional, Tuple, Union
 import numpy as np
-import math
+from spyrmsd import rmsd as srmsd
+# import math
 
 def rotx(deg):
     rad = deg / 180 * np.pi
@@ -86,6 +88,79 @@ def pureRMSD(P, Q):
     N = len(P)
     return np.sqrt((diff * diff).sum() / N)
 
+def symmRMSD(P, Q, atom_prop, adj_mtx, isomorphism):
+    # Symmetry corrected RMSD
+    return cached_symmrmsd(P, Q, atom_prop, atom_prop, adj_mtx, adj_mtx, isomorphisms=isomorphism)
+
+def cached_symmrmsd(
+    coordsref: np.ndarray,
+    coords: Union[np.ndarray, List[np.ndarray]],
+    apropsref: np.ndarray,
+    aprops: np.ndarray,
+    amref: np.ndarray,
+    am: np.ndarray,
+    center: bool = False,
+    minimize: bool = False,
+    cache: bool = True,
+    atol: float = 1e-9,
+    isomorphisms = None
+) -> Any:
+    """
+    Compute RMSD using graph isomorphism for multiple coordinates.
+
+    Parameters
+    ----------
+    coordsref: np.ndarray
+        Coordinate of reference molecule
+    coords: List[np.ndarray]
+        Coordinates of other molecule
+    apropsref: np.ndarray
+        Atomic properties for reference
+    aprops: np.ndarray
+        Atomic properties for other molecule
+    amref: np.ndarray
+        Adjacency matrix for reference molecule
+    am: np.ndarray
+        Adjacency matrix for other molecule
+    center: bool
+        Centering flag
+    minimize: bool
+        Minimum RMSD
+    cache: bool
+        Cache graph isomorphisms
+    atol: float
+        Absolute tolerance parameter for QCP (see :func:`qcp_rmsd`)
+
+    Returns
+    -------
+    float: Union[float, List[float]]
+        Symmetry-corrected RMSD(s) and graph isomorphisms
+
+    Notes
+    -----
+
+    Graph isomorphism is introduced for symmetry corrections. However, it is also
+    useful when two molecules do not have the atoms in the same order since atom
+    matching according to atomic numbers and the molecular connectivity is
+    performed. If atoms are in the same order and there is no symmetry, use the
+    `rmsd` function.
+    """
+
+    RMSD, isomorphism = srmsd._rmsd_isomorphic_core(
+        coordsref,
+        coords,
+        apropsref,
+        aprops,
+        amref,
+        am,
+        center=center,
+        minimize=minimize,
+        isomorphisms=isomorphisms,
+        atol=atol,
+    )
+
+    return RMSD, isomorphism
+
 
 def rotate_by_axis(v, a0, a1, degrees):
     """
@@ -94,10 +169,10 @@ def rotate_by_axis(v, a0, a1, degrees):
     https://stackoverflow.com/questions/6802577/rotation-of-3d-vector
     """
     axis = np.asarray(a1-a0)
-    axis = axis / math.sqrt(np.dot(axis, axis))
-    theta = degrees * math.pi / 180
-    a = math.cos(theta / 2.0)
-    b, c, d = -axis * math.sin(theta / 2.0)
+    axis = axis / np.sqrt(np.dot(axis, axis))
+    theta = degrees * np.pi / 180
+    a = np.cos(theta / 2.0)
+    b, c, d = -axis * np.sin(theta / 2.0)
     aa, bb, cc, dd = a * a, b * b, c * c, d * d
     bc, ad, ac, ab, bd, cd = b * c, a * d, a * c, a * b, b * d, c * d
     rot_mat = np.array([[aa + bb - cc - dd, 2 * (bc + ad), 2 * (bd - ac)],
@@ -106,5 +181,31 @@ def rotate_by_axis(v, a0, a1, degrees):
 
     return np.dot(rot_mat, (v-a1).T).T + a1
 
+def rotate_by_3pt(v0, v1, pt, degrees):
+#     print('v0', v0, '\nv1', v1, '\npt', pt, '\ndeg', degrees)
+    pv0 = pt[0] - pt[1]
+    pv1 = pt[2] - pt[1]
+    axis = np.cross(pv0, pv1)
+    axis = axis / np.sqrt(np.dot(axis, axis))
+    theta = -degrees * np.pi / 180 / 2.0 # Rotate half
+    a = np.cos(theta / 2.0)
+    b, c, d = -axis * np.sin(theta / 2.0)
+    aa, bb, cc, dd = a * a, b * b, c * c, d * d
+    bc, ad, ac, ab, bd, cd = b * c, a * d, a * c, a * b, b * d, c * d
+    rot_mat = np.array([[aa + bb - cc - dd, 2 * (bc + ad), 2 * (bd - ac)],
+                        [2 * (bc - ad), aa + cc - bb - dd, 2 * (cd + ab)],
+                        [2 * (bd + ac), 2 * (cd - ab), aa + dd - bb - cc]])
+    v0 = np.dot(rot_mat, (v0 - pt[1]).T).T + pt[1]
+    theta *= -1
+    b, c, d = -axis * np.sin(theta / 2.0)
+    aa, bb, cc, dd = a * a, b * b, c * c, d * d
+    bc, ad, ac, ab, bd, cd = b * c, a * d, a * c, a * b, b * d, c * d
+    rot_mat = np.array([[aa + bb - cc - dd, 2 * (bc + ad), 2 * (bd - ac)],
+                        [2 * (bc - ad), aa + cc - bb - dd, 2 * (cd + ab)],
+                        [2 * (bd + ac), 2 * (cd - ab), aa + dd - bb - cc]])
+    v1 = np.dot(rot_mat, (v1 - pt[1]).T).T + pt[1]
+
+    return v0, v1
+    
 def rotate_then_center(lig_coord, rot, xyz=np.array([0,0,0])):
     return (rot @ (lig_coord - lig_coord.mean(0)).T).T + xyz

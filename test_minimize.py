@@ -5,13 +5,13 @@ import importlib
 import numpy as np
 from saxstats import saxstats
 from Ligand import Ligand
-from WAXS import *
-from PDB import PDB
+#from WAXS import *
+#from PDB import PDB
 from Geometry import *
 import rdkit
 from rdkit import Chem
 import time
-from xs_helper import xray_scatter 
+#from xs_helper import xray_scatter 
 from array import array
 from scipy.optimize import minimize
 
@@ -41,13 +41,13 @@ print("Ground truth")
 print(lig_coord_gt)
 
 print("Minimized result")
-print(lig.transform(0, sp=res.x))
+print(lig.transform(0, res.x))
 
 print("Initial Kabsch RMSD")
 print(Kabsch_RMSD(lig_coord_gt, lig.get_coordinates())[0])
 
 print("Final RMSD")
-print(pureRMSD(lig_coord_gt, lig.transform(0, sp=res.x)))
+print(pureRMSD(lig_coord_gt, lig.transform(0, res.x)))
 
 print("Final Kabsch RMSD")
-print(Kabsch_RMSD(lig_coord_gt, lig.transform(0, sp=res.x))[0])
+print(Kabsch_RMSD(lig_coord_gt, lig.transform(0, res.x))[0])
