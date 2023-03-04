@@ -29,7 +29,7 @@ pv, pg, ps, lv, lg, ls = overlap_grid(pro, lig, conformerID=0, pocket=pocket,
 t1 = time.time()
 print(f'Time elapsed: {t1-t0:.3f} s')
 
-scat = Scatter(c2 = 2)
+scat = Scatter(c2 = 2, use_oa=1)
 
 
 S_calc_pro = scat.scatter(protein=pro)

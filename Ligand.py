@@ -9,23 +9,24 @@ from Geometry import *
 from rdkit.Geometry import Point3D
 
 class Ligand:
-    def __init__(self, mol, addHs=False):
+    def __init__(self, mol, addHs=False, removeHs=False):
         # mol can be filename of pdb, sdf, or a SMILES string
         if '.pdb' in mol:
             self.molecule = Chem.MolFromPDBFile(mol)
             self.molecule2 = Chem.MolFromPDBFile(mol) # This is for scipy.optimization, where we set coordinates to compute energy
         elif '.sdf' in mol:
-            self.molecule = Chem.MolFromMolFile(mol)
-            self.molecule2 = Chem.MolFromMolFile(mol)
+            self.molecule = Chem.MolFromMolFile(mol, removeHs=removeHs)
+            self.molecule2 = Chem.MolFromMolFile(mol, removeHs=removeHs)
         else:
             self.molecule = Chem.MolFromSmiles(mol)
-            self.molecule2 = Chem.MolFromMolFile(mol)
+            self.molecule2 = Chem.MolFromSmiles(mol)
 
         if addHs:
             self.molecule = Chem.AddHs(self.molecule, addCoords=True)
             self.molecule2 = Chem.AddHs(self.molecule2, addCoords=True)
 
         self.elements = np.array([self.molecule.GetAtoms()[x].GetSymbol() for x in range(self.molecule.GetNumAtoms())])
+        self.heavy_atom_idx = np.array([x for x in range(self.molecule.GetNumAtoms()) if self.molecule.GetAtoms()[x].GetSymbol() != 'H'])
         self.hasManyH = np.sum([x == 'H' for x in self.elements]) / np.sum([x != 'H' for x in self.elements]) > 0.1
         if not self.hasManyH:
             print("This ligand does not seem to have hydrogens modeled into them")
@@ -35,7 +36,7 @@ class Ligand:
         self.electrons = np.array([saxstats.electrons.get(x, 6) for x in self.elements])
         self.num_conformers = self.molecule.GetNumConformers()
         self.num_atoms = len(self.elements)
-
+        
 
         self.MMFF_pro = AllChem.MMFFGetMoleculeProperties(self.molecule) # pro stands for property
         self.MMFF_lig = AllChem.MMFFGetMoleculeForceField(self.molecule, self.MMFF_pro)
@@ -95,21 +96,20 @@ class Ligand:
         self.num_angle = len(self.agroup)
         
     def transform(self, conformerID=0, structure_parameters=None, debug=False):
-        # structure parameters should either be 6 or 6 + len(rgroup) values
-        # x, y, z, theta [0, pi], phi [0, 2*pi], torsions [0, 2*pi]
         # structure parameters should be a dict of np arrays:
         # t = [x, y, z] (translation)
-        # r = [rotx, roty, rotz] (rotation)
+        # r = [phi, theta], not [rotx, roty, rotz] (rotation)
         # a = [ang1, ang2, ...] (bond angles)
         # d = [dihe1, dihe2 ...] (dihedral angles / torsions)
         sp = structure_parameters.copy()
-        for t, n in zip(['t', 'r', 'a', 'd'], [3, 3, len(self.agroup), len(self.rgroup)]):
+        for t, n in zip(['t', 'r', 'a', 'd'], [[3], [2, 3], [len(self.agroup)], [len(self.rgroup)]]):
             if t in sp:
-                assert len(sp[t]) == n
+                #print(t, n)
+                assert len(sp[t]) in n
                 sp[t] = np.array(sp[t])
             else:
                 if t in ['t', 'r']:
-                    sp[t] = np.zeros(n)
+                    sp[t] = np.zeros(3)
         if debug:
             print(structure_parameters)
 
@@ -129,9 +129,12 @@ class Ligand:
                 if debug:
                     print(f'{idx}: ', end=' ')
                     print(f'Rotating atom group {self.agroup[idx][1]} and {self.agroup[idx][2]} by {r} degrees using {self.agroup[idx][0]} as axis')
-                coord[self.agroup[idx][1]], coord[self.agroup[idx][2]] = rotate_by_3pt(coord[self.agroup[idx][1]], coord[self.agroup[idx][2]], coord[self.agroup[idx][0]], r)
-
-        coord = rotate_then_center(coord, make_rot_xyz(*sp['r']), np.array(sp['t']))
+                #coord[self.agroup[idx][1]], coord[self.agroup[idx][2]] = rotate_by_3pt(coord[self.agroup[idx][1]], coord[self.agroup[idx][2]], coord[self.agroup[idx][0]], r)
+                coord[self.agroup[idx][1]] = rotate_by_3pt(coord[self.agroup[idx][0]], r, coord[self.agroup[idx][1]])
+        if len(sp['r']) == 2:
+            coord = rotate_then_center(coord, make_rot(*sp['r']), np.array(sp['t']))
+        elif len(sp['r']) == 3:
+            coord = rotate_then_center(coord, make_rot_xyz(*sp['r']), np.array(sp['t']))
         return coord  
 
     def calculate_energy(self, ligand_coords=None):
@@ -157,8 +160,13 @@ def rot_group(bond, rbond):
     G.add_edges_from(bond)
     for r in rbond:
         G.remove_edge(r[0], r[1])
-        rgroup.append([r, np.array(list(nx.descendants(G, r[1]))).astype(int)])
-        G.add_edge(r[0], r[1])
+        subG = list(G.subgraph(c) for c in nx.connected_components(G))
+        if len(subG) == 2:
+            if len(list(nx.descendants(G, r[0]))) < len(list(nx.descendants(G, r[1]))):
+                rgroup.append([r, np.array(list(nx.descendants(G, r[0]))).astype(int)])
+            else:
+                rgroup.append([r, np.array(list(nx.descendants(G, r[1]))).astype(int)])
+            G.add_edge(r[0], r[1])
     return rgroup
 
 def angle_group(bond, abond_candidate):
@@ -180,7 +188,11 @@ def angle_group(bond, abond_candidate):
                     break
             else:
                 # This is a valid bond angle
-                agroup.append([r, np.array(list(nx.descendants(G, r[0]) | {r[0]})).astype(int), np.array(list(nx.descendants(G, r[2]) | {r[2]})).astype(int)])
+                #agroup.append([r, np.array(list(nx.descendants(G, r[0]) | {r[0]})).astype(int), np.array(list(nx.descendants(G, r[2]) | {r[2]})).astype(int)])
+                if len(list(nx.descendants(G, r[0]))) < len(list(nx.descendants(G, r[2]))):
+                    agroup.append([r, np.array(list(nx.descendants(G, r[0]) | {r[0]})).astype(int)])
+                else:
+                    agroup.append([r, np.array(list(nx.descendants(G, r[2]) | {r[2]})).astype(int)])
         G.add_edge(r[0], r[1])
         G.add_edge(r[1], r[2])
 #     print(agroup)

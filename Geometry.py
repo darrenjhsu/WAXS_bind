@@ -181,13 +181,14 @@ def rotate_by_axis(v, a0, a1, degrees):
 
     return np.dot(rot_mat, (v-a1).T).T + a1
 
-def rotate_by_3pt(v0, v1, pt, degrees):
+def rotate_by_3pt(pt, degrees, v0, v1=None):
 #     print('v0', v0, '\nv1', v1, '\npt', pt, '\ndeg', degrees)
     pv0 = pt[0] - pt[1]
     pv1 = pt[2] - pt[1]
     axis = np.cross(pv0, pv1)
     axis = axis / np.sqrt(np.dot(axis, axis))
-    theta = -degrees * np.pi / 180 / 2.0 # Rotate half
+    #theta = -degrees * np.pi / 180 / 2.0 # Rotate half
+    theta = -degrees * np.pi / 180 # Rotate full
     a = np.cos(theta / 2.0)
     b, c, d = -axis * np.sin(theta / 2.0)
     aa, bb, cc, dd = a * a, b * b, c * c, d * d
@@ -196,16 +197,16 @@ def rotate_by_3pt(v0, v1, pt, degrees):
                         [2 * (bc - ad), aa + cc - bb - dd, 2 * (cd + ab)],
                         [2 * (bd + ac), 2 * (cd - ab), aa + dd - bb - cc]])
     v0 = np.dot(rot_mat, (v0 - pt[1]).T).T + pt[1]
-    theta *= -1
-    b, c, d = -axis * np.sin(theta / 2.0)
-    aa, bb, cc, dd = a * a, b * b, c * c, d * d
-    bc, ad, ac, ab, bd, cd = b * c, a * d, a * c, a * b, b * d, c * d
-    rot_mat = np.array([[aa + bb - cc - dd, 2 * (bc + ad), 2 * (bd - ac)],
-                        [2 * (bc - ad), aa + cc - bb - dd, 2 * (cd + ab)],
-                        [2 * (bd + ac), 2 * (cd - ab), aa + dd - bb - cc]])
-    v1 = np.dot(rot_mat, (v1 - pt[1]).T).T + pt[1]
+    #theta *= -1
+    #b, c, d = -axis * np.sin(theta / 2.0)
+    #aa, bb, cc, dd = a * a, b * b, c * c, d * d
+    #bc, ad, ac, ab, bd, cd = b * c, a * d, a * c, a * b, b * d, c * d
+    #rot_mat = np.array([[aa + bb - cc - dd, 2 * (bc + ad), 2 * (bd - ac)],
+    #                    [2 * (bc - ad), aa + cc - bb - dd, 2 * (cd + ab)],
+    #                    [2 * (bd + ac), 2 * (cd - ab), aa + dd - bb - cc]])
+    #v1 = np.dot(rot_mat, (v1 - pt[1]).T).T + pt[1]
 
-    return v0, v1
+    return v0#, v1
     
 def rotate_then_center(lig_coord, rot, xyz=np.array([0,0,0])):
     return (rot @ (lig_coord - lig_coord.mean(0)).T).T + xyz
