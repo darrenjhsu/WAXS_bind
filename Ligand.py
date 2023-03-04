@@ -36,13 +36,13 @@ class Ligand:
         self.electrons = np.array([saxstats.electrons.get(x, 6) for x in self.elements])
         self.num_conformers = self.molecule.GetNumConformers()
         self.num_atoms = len(self.elements)
-        
 
         self.MMFF_pro = AllChem.MMFFGetMoleculeProperties(self.molecule) # pro stands for property
         self.MMFF_lig = AllChem.MMFFGetMoleculeForceField(self.molecule, self.MMFF_pro)
         self.partial_charge = np.array([self.MMFF_pro.GetMMFFPartialCharge(x) for x in range(self.num_atoms)])
         self.process_bonds()
         self.process_angles()
+        self.process_improper()
         self.process_graph()
 
     def generate_conformers(self, num_conformers=10):
@@ -94,7 +94,24 @@ class Ligand:
 #                         print(i,j,k,self.MMFF_pro.GetMMFFAngleBendParams(self.molecule, i,j,k))
         self.agroup = angle_group(self.bond, agroup_candidates)
         self.num_angle = len(self.agroup)
-        
+
+    def process_improper(self):
+        # find sp3 and degree 3 atoms, could be carbon or nitrogen
+        igroup_candidates = []
+        for ii in range(self.num_atoms):
+            if (self.molecule.GetAtomWithIdx(ii).GetHybridization() == rdkit.Chem.rdchem.HybridizationType.SP3) and \
+               (self.molecule.GetAtomWithIdx(ii).GetDegree() == 3):
+                #print(f'Atom {ii} is qualified to have an improper term')
+                bonded_atoms = [ii]
+                for b in self.molecule.GetAtomWithIdx(ii).GetBonds():
+                    if b.GetBeginAtomIdx() != ii:
+                        bonded_atoms.append(b.GetBeginAtomIdx())
+                    else:
+                        bonded_atoms.append(b.GetEndAtomIdx())
+                igroup_candidates.append(np.array(bonded_atoms))
+        self.igroup = improper_group(self.bond, igroup_candidates)
+        self.num_improper = len(self.igroup)
+
     def transform(self, conformerID=0, structure_parameters=None, debug=False):
         # structure parameters should be a dict of np arrays:
         # t = [x, y, z] (translation)
@@ -102,7 +119,7 @@ class Ligand:
         # a = [ang1, ang2, ...] (bond angles)
         # d = [dihe1, dihe2 ...] (dihedral angles / torsions)
         sp = structure_parameters.copy()
-        for t, n in zip(['t', 'r', 'a', 'd'], [[3], [2, 3], [len(self.agroup)], [len(self.rgroup)]]):
+        for t, n in zip(['t', 'r', 'a', 'd', 'i'], [[3], [2, 3], [self.num_angle], [self.num_torsion], [self.num_improper]]):
             if t in sp:
                 #print(t, n)
                 assert len(sp[t]) in n
@@ -114,7 +131,18 @@ class Ligand:
             print(structure_parameters)
 
         coord = self.get_coordinates(conformerID=conformerID).copy()
-        
+       
+        # Transform by improper
+        if 'i' in sp:
+            # Transform by angle
+            for idx, r in enumerate(sp['i']):
+                if debug:
+                    print(f'{idx}: ', end=' ')
+                    print(f'Rotating atom group {self.agroup[idx][1]} by {r} degrees using {self.agroup[idx][0]} as axis')
+                point = np.vstack([coord[self.igroup[idx][0][[1, 0]]], coord[self.igroup[idx][0][2:]].mean(0)])
+                #print(point)
+                coord[self.igroup[idx][1]] = rotate_by_3pt(point, r, coord[self.igroup[idx][1]])
+     
         # Transform by torsion
         if 'd' in sp:
             for idx, r in enumerate(sp['d']):
@@ -128,9 +156,10 @@ class Ligand:
             for idx, r in enumerate(sp['a']):
                 if debug:
                     print(f'{idx}: ', end=' ')
-                    print(f'Rotating atom group {self.agroup[idx][1]} and {self.agroup[idx][2]} by {r} degrees using {self.agroup[idx][0]} as axis')
+                    print(f'Rotating atom group {self.agroup[idx][1]} by {r} degrees using {self.agroup[idx][0]} as axis')
                 #coord[self.agroup[idx][1]], coord[self.agroup[idx][2]] = rotate_by_3pt(coord[self.agroup[idx][1]], coord[self.agroup[idx][2]], coord[self.agroup[idx][0]], r)
                 coord[self.agroup[idx][1]] = rotate_by_3pt(coord[self.agroup[idx][0]], r, coord[self.agroup[idx][1]])
+
         if len(sp['r']) == 2:
             coord = rotate_then_center(coord, make_rot(*sp['r']), np.array(sp['t']))
         elif len(sp['r']) == 3:
@@ -198,8 +227,34 @@ def angle_group(bond, abond_candidate):
 #     print(agroup)
     return agroup
                         
-                    
-          
+def improper_group(bond, ibond_candidate):
+    igroup = []
+    # Create graph
+    G = nx.Graph()
+    G.add_edges_from(bond)
+    for r in ibond_candidate:
+        #print(f'Processing candidate {r}')
+        # remove all edges of that atom
+        G.remove_edge(r[0], r[1])
+        G.remove_edge(r[0], r[2])
+        G.remove_edge(r[0], r[3])
+        subG = list(G.subgraph(c) for c in nx.connected_components(G))
+        #print(len(subG))
+        #print(f'Graph is split to {len(subG)} subgraphs')
+        # look at num of sub graphs
+        # Look at if only one sub graph has len > 1 (if so skip)
+        if (len(subG) == 3) and (np.sum([len(x) > 1 for x in subG]) > 1):
+            for subG_idx in range(3):
+                for p in [[1, 2, 3], [1, 3, 2], [2, 3, 1]]:
+                    # Look at which two atoms are in the same graph - that's one group
+                    if r[p[0]] in subG[subG_idx] and r[p[1]] in subG[subG_idx]:         
+                        igroup.append([np.array(r[[0, p[2], p[0], p[1]]]), np.array(list(nx.descendants(G, r[p[2]]) | {r[p[2]]})).astype(int)])
+        # restore bonds
+        G.add_edge(r[0], r[1])
+        G.add_edge(r[0], r[2])
+        G.add_edge(r[0], r[3])
+    print(igroup) 
+    return igroup 
             
             
 
